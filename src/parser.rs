@@ -1,7 +1,7 @@
 pub trait Parser {
     type Output;
 
-    fn parse<'a>(&self, input: &'a str) -> (Option<Self::Output>, &'a str);
+    fn parse<'a>(&mut self, input: &'a str) -> (Option<Self::Output>, &'a str);
 }
 
 // TODO: Fix this.

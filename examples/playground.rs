@@ -4,7 +4,7 @@ extern crate avocadotoast;
 use avocadotoast::Parser;
 
 fn main() {
-    let parser = avocadotoast::char('(');
+    let mut parser = avocadotoast::char('(');
 
     println!("{:?}", parser.parse("(x)"));
     println!("{:?}", parser.parse(")x("));
