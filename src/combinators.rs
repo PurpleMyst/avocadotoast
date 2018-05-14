@@ -1,25 +1,5 @@
 use parser::Parser;
 
-pub fn char(c: char) -> impl Parser<Output = char> {
-    struct CharCombinator(char);
-
-    impl Parser for CharCombinator {
-        type Output = char;
-
-        fn parse<'a>(&mut self, input: &'a str) -> (Option<Self::Output>, &'a str) {
-            let mut input_chars = input.chars();
-
-            if input_chars.next() == Some(self.0) {
-                (Some(self.0), input_chars.as_str())
-            } else {
-                (None, input)
-            }
-        }
-    }
-
-    CharCombinator(c)
-}
-
 pub fn predicate<P: Fn(char) -> bool>(predicate: P) -> impl Parser<Output = char> {
     struct PredicateCombinator<P: Fn(char) -> bool>(P);
 
@@ -39,18 +19,38 @@ pub fn predicate<P: Fn(char) -> bool>(predicate: P) -> impl Parser<Output = char
     PredicateCombinator(predicate)
 }
 
+pub fn char(c: char) -> impl Parser<Output = char> {
+    predicate(move |ic| c == ic)
+}
+
+pub fn many<O, P: Parser<Output = O>>(parser: P) -> impl Parser<Output = Vec<O>> {
+    struct ManyCombinator<O, P: Parser<Output = O>>(P);
+
+    impl<O, P: Parser<Output = O>> Parser for ManyCombinator<O, P> {
+        type Output = Vec<O>;
+
+        fn parse<'a>(&mut self, mut input: &'a str) -> (Option<Self::Output>, &'a str) {
+            let mut result = Vec::new();
+
+            while let (Some(out), new_input) = self.0.parse(input) {
+                result.push(out);
+                input = new_input;
+            }
+
+            (Some(result), input)
+        }
+    }
+
+    ManyCombinator(parser)
+}
+
+pub fn many1<O, P: Parser<Output = O>>(parser: P) -> impl Parser<Output = Vec<O>> {
+    many(parser).map(|out| if out.len() == 0 { None } else { Some(out) })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn char_works() {
-        let mut parser = char('(');
-
-        assert_eq!(parser.parse("()"), (Some('('), ")"));
-        assert_eq!(parser.parse(")("), (None, ")("));
-        assert_eq!(parser.parse(""), (None, ""));
-    }
 
     #[test]
     fn predicate_works() {
@@ -62,5 +62,30 @@ mod tests {
             (None, "this is not a number, i promise")
         );
         assert_eq!(parser.parse(""), (None, ""));
+    }
+
+    #[test]
+    fn char_works() {
+        let mut parser = char('(');
+
+        assert_eq!(parser.parse("()"), (Some('('), ")"));
+        assert_eq!(parser.parse(")("), (None, ")("));
+        assert_eq!(parser.parse(""), (None, ""));
+    }
+
+    #[test]
+    fn many_works() {
+        let mut parser = many(char('('));
+
+        assert_eq!(parser.parse("((()))"), (Some(vec!['(', '(', '(']), ")))"));
+        assert_eq!(parser.parse(")))((("), (Some(vec![]), ")))((("));
+    }
+
+    #[test]
+    fn many1_works() {
+        let mut parser = many1(char('('));
+
+        assert_eq!(parser.parse("((()))"), (Some(vec!['(', '(', '(']), ")))"));
+        assert_eq!(parser.parse(")))((("), (None, ")))((("));
     }
 }
